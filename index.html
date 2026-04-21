@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Keyword Explorer - SEO Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .loader {
+            border: 3px solid #f3f3f3; border-top: 3px solid #ef4444;
+            border-radius: 50%; width: 20px; height: 20px;
+            animation: spin 1s linear infinite; display: inline-block;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #e2e8f0; }
+        .tag-pill { background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; display: inline-block; margin: 2px; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800">
+
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- HEADER -->
+        <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="text-center md:text-left flex items-center gap-4">
+                <div class="bg-red-100 p-3 rounded-xl text-red-600 text-3xl"><i class="fa-brands fa-youtube"></i></div>
+                <div>
+                    <h1 class="text-2xl font-black text-slate-900 leading-tight">YouTube Keyword Explorer</h1>
+                    <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Market Research & Search Intent</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <input type="password" id="apiKeyInput" placeholder="API Key (Google Cloud)..." 
+                       class="px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm font-mono bg-slate-50 min-w-[250px]">
+                <button type="button" id="verify-key-btn" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap">
+                    Conectar APIs
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN SEARCH BAR -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
+            <form id="search-form" class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1 relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="keyword" required placeholder="Ingresa tu palabra clave (ej: curso de javascript, mejor microfono podcast)..." 
+                           class="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all font-medium text-lg">
+                </div>
+                <button type="submit" id="search-btn" class="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2">
+                    <span id="btn-text">Analizar Mercado</span>
+                    <i class="fa-solid fa-satellite-dish"></i>
+                </button>
+            </form>
+            <div id="loading-state" class="hidden mt-4 flex items-center justify-center gap-3 text-red-600 font-bold text-sm bg-red-50 py-3 rounded-lg">
+                <div class="loader"></div> <span id="loading-text">Extrayendo datos de YouTube...</span>
+            </div>
+            <div id="error-state" class="hidden mt-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm font-medium"></div>
+        </div>
+
+        <!-- DASHBOARD (Hidden initally) -->
+        <div id="dashboard" class="hidden space-y-8">
+            
+            <!-- TOP METRICS CARDS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card p-6 rounded-2xl shadow-sm">
+                    <div class="text-slate-400 text-xs font-black uppercase tracking-widest mb-2"><i class="fa-solid fa-eye text-blue-500 mr-1"></i> Max Visualizaciones</div>
+                    <div id="max-views" class="text-3xl font-black text-slate-800">0</div>
+                    <div class="text-xs text-slate-500 mt-1">El techo de la keyword</div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl shadow-sm">
+                    <div class="text-slate-400 text-xs font-black uppercase tracking-widest mb-2"><i class="fa-solid fa-eye-low-vision text-amber-500 mr-1"></i> Min Visualizaciones</div>
+                    <div id="min-views" class="text-3xl font-black text-slate-800">0</div>
+                    <div class="text-xs text-slate-500 mt-1">Suelo para posicionar en Top 15</div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl shadow-sm">
+                    <div class="text-slate-400 text-xs font-black uppercase tracking-widest mb-2"><i class="fa-solid fa-stopwatch text-emerald-500 mr-1"></i> Duración Media</div>
+                    <div id="avg-duration" class="text-3xl font-black text-slate-800">00:00</div>
+                    <div class="text-xs text-slate-500 mt-1">Tiempo ideal de tu video</div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl shadow-sm bg-gradient-to-br from-slate-800 to-slate-900 text-white border-none">
+                    <div class="text-slate-400 text-xs font-black uppercase tracking-widest mb-2"><i class="fa-solid fa-chart-pie text-red-400 mr-1"></i> Dificultad Estimada</div>
+                    <div id="difficulty-score" class="text-3xl font-black text-white">--/100</div>
+                    <div class="text-xs text-slate-400 mt-1">Basado en promedio de views</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- COLUMNA IZQUIERDA: Insights AI -->
+                <div class="lg:col-span-2 space-y-8">
+                    
+                    <!-- Intención de Búsqueda y Estrategia -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">
+                            <i class="fa-solid fa-brain text-indigo-500 mr-2"></i> Análisis Estratégico (Gemini AI)
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                                <h4 class="text-xs font-bold text-indigo-800 uppercase mb-2">Segmentación de Intención</h4>
+                                <div id="intent-analysis" class="text-sm text-indigo-900"></div>
+                            </div>
+                            <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                <h4 class="text-xs font-bold text-emerald-800 uppercase mb-2">Potencial AdSense / Negocio</h4>
+                                <div id="business-analysis" class="text-sm text-emerald-900"></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                            <h4 class="text-xs font-black text-slate-600 uppercase mb-3"><i class="fa-solid fa-seedling text-green-600 mr-1"></i> Estrategia de Crecimiento de Canal</h4>
+                            <p id="growth-strategy" class="text-sm text-slate-700 leading-relaxed"></p>
+                        </div>
+                    </div>
+
+                    <!-- Preguntas del Usuario -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">
+                            <i class="fa-solid fa-comments text-amber-500 mr-2"></i> Preguntas Frecuentes de la Audiencia
+                        </h3>
+                        <div id="questions-list" class="space-y-3">
+                            <!-- Inyectado JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMNA DERECHA: Datos Duros -->
+                <div class="space-y-8">
+                    
+                    <!-- Etiquetas Comunes -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">
+                            <i class="fa-solid fa-tags text-red-500 mr-2"></i> Top Etiquetas Relacionadas
+                        </h3>
+                        <p class="text-xs text-slate-500 mb-4">Extraídas directamente del Top 15 de videos posicionados.</p>
+                        <div id="tags-cloud" class="flex flex-wrap gap-1">
+                            <!-- Inyectado JS -->
+                        </div>
+                    </div>
+
+                    <!-- Sugerencias Long Tail -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">
+                            <i class="fa-solid fa-chart-line text-blue-500 mr-2"></i> Oportunidades Long-Tail
+                        </h3>
+                        <ul id="long-tail-list" class="space-y-2 text-sm text-slate-700">
+                            <!-- Inyectado JS -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLA DE COMPETENCIA -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">
+                    <i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> Análisis de Competencia (Top Posicionados)
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Video</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Canal</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Vistas</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase border-b border-slate-200">Duración</th>
+                            </tr>
+                        </thead>
+                        <tbody id="competitors-table" class="divide-y divide-slate-100 text-sm">
+                            <!-- Inyectado JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Utilidad: Parsear formato ISO 8601 de duración de YouTube (Ej: PT15M33S a Segundos)
+        function parseISO8601Duration(duration) {
+            const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            if (!match) return 0;
+            const hours = parseInt(match[1]) || 0;
+            const minutes = parseInt(match[2]) || 0;
+            const seconds = parseInt(match[3]) || 0;
+            return (hours * 3600) + (minutes * 60) + seconds;
+        }
+
+        // Utilidad: Formatear segundos a MM:SS
+        function formatSeconds(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = Math.floor(totalSeconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Utilidad: Formatear números grandes (Ej: 1500000 -> 1.5M)
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        document.getElementById('verify-key-btn').addEventListener('click', async () => {
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const btn = document.getElementById('verify-key-btn');
+            
+            if (!apiKey) return alert("Por favor ingresa tu API Key.");
+            
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                // Verificar ambas APIs con peticiones muy ligeras
+                const ytCheck = await fetch(`https://www.googleapis.com/youtube/v3/search?part=id&maxResults=1&q=test&key=${apiKey}`);
+                if (!ytCheck.ok) throw new Error("YouTube API no activada en esta llave.");
+                
+                const geminiCheck = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                if (!geminiCheck.ok) throw new Error("Gemini API no activada en esta llave.");
+
+                btn.className = "bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg";
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Conectado';
+            } catch (error) {
+                btn.className = "bg-red-600 text-white px-6 py-2 rounded-xl text-sm font-bold";
+                btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Error';
+                alert(error.message);
+            }
+        });
+
+        document.getElementById('search-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const keyword = document.getElementById('keyword').value.trim();
+            if (!apiKey) return alert("Valida tu API Key primero.");
+
+            const submitBtn = document.getElementById('search-btn');
+            const loading = document.getElementById('loading-state');
+            const loadingText = document.getElementById('loading-text');
+            const errorSt = document.getElementById('error-state');
+            const dashboard = document.getElementById('dashboard');
+            
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50');
+            loading.classList.remove('hidden');
+            errorSt.classList.add('hidden');
+            dashboard.classList.add('hidden');
+
+            try {
+                // 1. BUSCAR VIDEOS EN YOUTUBE
+                loadingText.textContent = "Paso 1: Buscando videos posicionados...";
+                const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${encodeURIComponent(keyword)}&type=video&key=${apiKey}`);
+                if (!searchRes.ok) throw new Error("Fallo al buscar en YouTube. Revisa cuotas de API.");
+                const searchData = await searchRes.json();
+                
+                if (searchData.items.length === 0) throw new Error("No se encontraron videos para esta palabra clave.");
+
+                const videoIds = searchData.items.map(item => item.id.videoId).join(',');
+
+                // 2. OBTENER DETALLES (VISTAS, DURACIÓN, TAGS)
+                loadingText.textContent = "Paso 2: Extrayendo analíticas profundas (Vistas, Tags)...";
+                const detailsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${apiKey}`);
+                const detailsData = await detailsRes.json();
+
+                const videos = detailsData.items;
+
+                // --- PROCESAMIENTO DE DATOS ---
+                let totalViews = 0;
+                let maxViews = 0;
+                let minViews = Infinity;
+                let totalSeconds = 0;
+                let allTags = {};
+
+                const tableHTML = videos.map(v => {
+                    const views = parseInt(v.statistics.viewCount || 0);
+                    const seconds = parseISO8601Duration(v.contentDetails.duration);
+                    
+                    totalViews += views;
+                    if (views > maxViews) maxViews = views;
+                    if (views < minViews) minViews = views;
+                    totalSeconds += seconds;
+
+                    // Recolectar Tags
+                    if (v.snippet.tags) {
+                        v.snippet.tags.forEach(tag => {
+                            const t = tag.toLowerCase();
+                            allTags[t] = (allTags[t] || 0) + 1;
+                        });
+                    }
+
+                    return `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="p-3 border-b border-slate-100">
+                                <div class="flex items-center gap-3">
+                                    <img src="${v.snippet.thumbnails.default.url}" class="w-12 h-8 object-cover rounded shadow-sm">
+                                    <a href="https://youtube.com/watch?v=${v.id}" target="_blank" class="font-bold text-indigo-600 hover:underline truncate max-w-[200px] md:max-w-xs inline-block">${v.snippet.title}</a>
+                                </div>
+                            </td>
+                            <td class="p-3 border-b border-slate-100 text-slate-600">${v.snippet.channelTitle}</td>
+                            <td class="p-3 border-b border-slate-100 font-bold text-slate-800">${formatNumber(views)}</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-600">${formatSeconds(seconds)}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const avgViews = Math.floor(totalViews / videos.length);
+                const avgSeconds = Math.floor(totalSeconds / videos.length);
+                if (minViews === Infinity) minViews = 0;
+
+                // Sort Tags by frequency
+                const sortedTags = Object.entries(allTags).sort((a, b) => b[1] - a[1]).slice(0, 15);
+                const tagsHTML = sortedTags.map(t => `<span class="tag-pill">${t[0]}</span>`).join('');
+
+                // Update UI Metrics
+                document.getElementById('max-views').textContent = formatNumber(maxViews);
+                document.getElementById('min-views').textContent = formatNumber(minViews);
+                document.getElementById('avg-duration').textContent = formatSeconds(avgSeconds);
+                
+                // Difficulty simple math
+                let diffStr = "Media";
+                if (avgViews > 500000) diffStr = "Muy Alta";
+                else if (avgViews > 100000) diffStr = "Alta";
+                else if (avgViews < 10000) diffStr = "Baja";
+                document.getElementById('difficulty-score').textContent = diffStr;
+
+                document.getElementById('tags-cloud').innerHTML = tagsHTML || '<span class="text-xs text-slate-400">Sin etiquetas detectadas.</span>';
+                document.getElementById('competitors-table').innerHTML = tableHTML;
+
+                // 3. ANÁLISIS DE GEMINI AI
+                loadingText.textContent = "Paso 3: Inteligencia Artificial analizando intención y estrategia...";
+                
+                // Prepare context for Gemini
+                const videoContext = videos.map(v => `- Título: ${v.snippet.title} | Vistas: ${formatNumber(parseInt(v.statistics.viewCount))} | Canal: ${v.snippet.channelTitle}`).join('\n');
+
+                const prompt = `
+                Actúa como un Estratega SEO Senior de YouTube y Analista de Negocios.
+                Analiza esta palabra clave: "${keyword}".
+                Aquí están los datos del Top de videos actuales:
+                ${videoContext}
+
+                Responde ÚNICAMENTE en JSON con esta estructura exacta:
+                {
+                    "intent": "Clasifica la intención en 1 párrafo (¿Buscan aprender, comprar, comparar? ¿Qué tipo de usuario es?).",
+                    "business": "Estimación de AdSense y Patrocinios. ¿Es un nicho rentable? ¿Es fácil vender algo aquí?",
+                    "growth_strategy": "Analizando los títulos del top, dime qué formato de video contribuye al crecimiento a largo plazo (fidelidad) vs cuáles son solo vistas vacías. Da 1 consejo accionable.",
+                    "questions": ["Pregunta frecuente 1", "Pregunta frecuente 2", "Pregunta frecuente 3", "Pregunta frecuente 4", "Pregunta frecuente 5"],
+                    "long_tail": ["Keyword long tail 1", "Keyword long tail 2", "Keyword long tail 3", "Keyword long tail 4"]
+                }
+                `;
+
+                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                if (!aiRes.ok) throw new Error("Fallo en el análisis de Gemini.");
+                const aiData = await aiRes.json();
+                const aiAnalysis = JSON.parse(aiData.candidates[0].content.parts[0].text);
+
+                // Populate AI data
+                document.getElementById('intent-analysis').textContent = aiAnalysis.intent;
+                document.getElementById('business-analysis').textContent = aiAnalysis.business;
+                document.getElementById('growth-strategy').textContent = aiAnalysis.growth_strategy;
+                
+                document.getElementById('questions-list').innerHTML = aiAnalysis.questions.map(q => `
+                    <div class="bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-start gap-2">
+                        <i class="fa-solid fa-circle-question text-amber-500 mt-1"></i>
+                        <span class="text-sm font-medium text-amber-900">${q}</span>
+                    </div>
+                `).join('');
+
+                document.getElementById('long-tail-list').innerHTML = aiAnalysis.long_tail.map(kw => `
+                    <li class="flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-trend-up text-blue-500"></i>
+                        <span class="font-medium">${kw}</span>
+                    </li>
+                `).join('');
+
+                // SHOW DASHBOARD
+                dashboard.classList.remove('hidden');
+
+            } catch (error) {
+                console.error(error);
+                errorSt.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i> ${error.message}`;
+                errorSt.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50');
+            }
+        });
+    </script>
+</body>
+</html>
