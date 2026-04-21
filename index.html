@@ -365,17 +365,38 @@
                 }
                 `;
 
-                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { responseMimeType: "application/json" }
-                    })
-                });
+                // Llamada a Gemini con reintentos automáticos (por rate limit 429)
+                const MAX_RETRIES = 3;
+                const RETRY_DELAY_MS = 6000; // 6 segundos entre intentos
+                let aiData = null;
 
-                if (!aiRes.ok) throw new Error("Fallo en el análisis de Gemini.");
-                const aiData = await aiRes.json();
+                for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                    if (attempt > 1) {
+                        loadingText.textContent = `Gemini ocupado, reintentando en 6s... (intento ${attempt}/${MAX_RETRIES})`;
+                        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                    }
+                    loadingText.textContent = `Paso 3: Analizando con Gemini AI... (intento ${attempt}/${MAX_RETRIES})`;
+
+                    const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+
+                    if (aiRes.status === 429) {
+                        if (attempt === MAX_RETRIES) throw new Error("Gemini está saturado (límite de peticiones). Espera 1 minuto e intenta de nuevo.");
+                        continue; // reintenta
+                    }
+
+                    if (!aiRes.ok) throw new Error(`Error de Gemini (${aiRes.status}). Verifica tu API Key de AI Studio.`);
+
+                    aiData = await aiRes.json();
+                    break; // éxito, salir del loop
+                }
+
                 const aiAnalysis = JSON.parse(aiData.candidates[0].content.parts[0].text);
 
                 // Populate AI data
