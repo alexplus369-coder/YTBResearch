@@ -343,10 +343,10 @@
                 document.getElementById('tags-cloud').innerHTML = tagsHTML || '<span class="text-xs text-slate-400">Sin etiquetas detectadas.</span>';
                 document.getElementById('competitors-table').innerHTML = tableHTML;
 
-                // 3. ANÁLISIS DE GEMINI AI
+
+                // 3. ANÁLISIS DE GEMINI AI (opcional - si falla, igual se muestra el dashboard)
                 loadingText.textContent = "Paso 3: Inteligencia Artificial analizando intención y estrategia...";
                 
-                // Prepare context for Gemini
                 const videoContext = videos.map(v => `- Título: ${v.snippet.title} | Vistas: ${formatNumber(parseInt(v.statistics.viewCount))} | Canal: ${v.snippet.channelTitle}`).join('\n');
 
                 const prompt = `
@@ -365,58 +365,76 @@
                 }
                 `;
 
-                // Llamada a Gemini con reintentos automáticos (por rate limit 429)
-                const MAX_RETRIES = 3;
-                const RETRY_DELAY_MS = 6000; // 6 segundos entre intentos
-                let aiData = null;
+                let aiAnalysis = null;
+                try {
+                    const MAX_RETRIES = 3;
+                    const RETRY_DELAY_MS = 6000;
+                    let aiData = null;
 
-                for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                    if (attempt > 1) {
-                        loadingText.textContent = `Gemini ocupado, reintentando en 6s... (intento ${attempt}/${MAX_RETRIES})`;
-                        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                        if (attempt > 1) {
+                            loadingText.textContent = `Gemini ocupado, reintentando en 6s... (intento ${attempt}/${MAX_RETRIES})`;
+                            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                        }
+                        loadingText.textContent = `Paso 3: Analizando con Gemini AI... (intento ${attempt}/${MAX_RETRIES})`;
+
+                        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: prompt }] }],
+                                generationConfig: { responseMimeType: "application/json" }
+                            })
+                        });
+
+                        if (aiRes.status === 429) {
+                            if (attempt === MAX_RETRIES) throw new Error("rate_limit");
+                            continue;
+                        }
+                        if (!aiRes.ok) throw new Error(`api_error_${aiRes.status}`);
+
+                        aiData = await aiRes.json();
+                        break;
                     }
-                    loadingText.textContent = `Paso 3: Analizando con Gemini AI... (intento ${attempt}/${MAX_RETRIES})`;
-
-                    const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: { responseMimeType: "application/json" }
-                        })
-                    });
-
-                    if (aiRes.status === 429) {
-                        if (attempt === MAX_RETRIES) throw new Error("Gemini está saturado (límite de peticiones). Espera 1 minuto e intenta de nuevo.");
-                        continue; // reintenta
-                    }
-
-                    if (!aiRes.ok) throw new Error(`Error de Gemini (${aiRes.status}). Verifica tu API Key de AI Studio.`);
-
-                    aiData = await aiRes.json();
-                    break; // éxito, salir del loop
+                    aiAnalysis = JSON.parse(aiData.candidates[0].content.parts[0].text);
+                } catch (aiError) {
+                    // Gemini falló — mostrar aviso pero continuar con el dashboard
+                    const isRateLimit = aiError.message === "rate_limit";
+                    const aiSection = document.querySelector('#intent-analysis').closest('.bg-white');
+                    aiSection.innerHTML = `
+                        <div class="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-500 text-xl"></i>
+                            <div>
+                                <p class="font-bold text-amber-800 text-sm">Análisis AI no disponible</p>
+                                <p class="text-amber-700 text-xs mt-1">
+                                    ${isRateLimit 
+                                        ? 'Límite de peticiones de Gemini alcanzado. Espera 1 minuto y recarga. Los datos de YouTube se muestran igualmente.' 
+                                        : 'Error al conectar con Gemini AI. Verifica tu key. Los datos de YouTube se muestran igualmente.'}
+                                </p>
+                            </div>
+                        </div>`;
                 }
 
-                const aiAnalysis = JSON.parse(aiData.candidates[0].content.parts[0].text);
+                // Si Gemini respondió, llenar las secciones AI
+                if (aiAnalysis) {
+                    document.getElementById('intent-analysis').textContent = aiAnalysis.intent;
+                    document.getElementById('business-analysis').textContent = aiAnalysis.business;
+                    document.getElementById('growth-strategy').textContent = aiAnalysis.growth_strategy;
+                    
+                    document.getElementById('questions-list').innerHTML = aiAnalysis.questions.map(q => `
+                        <div class="bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-start gap-2">
+                            <i class="fa-solid fa-circle-question text-amber-500 mt-1"></i>
+                            <span class="text-sm font-medium text-amber-900">${q}</span>
+                        </div>
+                    `).join('');
 
-                // Populate AI data
-                document.getElementById('intent-analysis').textContent = aiAnalysis.intent;
-                document.getElementById('business-analysis').textContent = aiAnalysis.business;
-                document.getElementById('growth-strategy').textContent = aiAnalysis.growth_strategy;
-                
-                document.getElementById('questions-list').innerHTML = aiAnalysis.questions.map(q => `
-                    <div class="bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-start gap-2">
-                        <i class="fa-solid fa-circle-question text-amber-500 mt-1"></i>
-                        <span class="text-sm font-medium text-amber-900">${q}</span>
-                    </div>
-                `).join('');
-
-                document.getElementById('long-tail-list').innerHTML = aiAnalysis.long_tail.map(kw => `
-                    <li class="flex items-center gap-2">
-                        <i class="fa-solid fa-arrow-trend-up text-blue-500"></i>
-                        <span class="font-medium">${kw}</span>
-                    </li>
-                `).join('');
+                    document.getElementById('long-tail-list').innerHTML = aiAnalysis.long_tail.map(kw => `
+                        <li class="flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-trend-up text-blue-500"></i>
+                            <span class="font-medium">${kw}</span>
+                        </li>
+                    `).join('');
+                }
 
                 // SHOW DASHBOARD
                 dashboard.classList.remove('hidden');
