@@ -37,10 +37,20 @@
                 </div>
             </div>
             
-            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <input type="password" id="apiKeyInput" placeholder="API Key (Google Cloud)..." 
-                       class="px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm font-mono bg-slate-50 min-w-[250px]">
-                <button type="button" id="verify-key-btn" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap">
+            <div class="flex flex-col gap-2 w-full md:w-auto">
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <div class="relative flex-1">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 text-xs font-black">YT</span>
+                        <input type="password" id="ytApiKeyInput" placeholder="YouTube API Key (Google Cloud)..." 
+                               class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm font-mono bg-slate-50 min-w-[230px]">
+                    </div>
+                    <div class="relative flex-1">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 text-xs font-black">AI</span>
+                        <input type="password" id="geminiApiKeyInput" placeholder="Gemini API Key (AI Studio)..." 
+                               class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono bg-slate-50 min-w-[230px]">
+                    </div>
+                </div>
+                <button type="button" id="verify-key-btn" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap w-full sm:w-auto self-end">
                     Conectar APIs
                 </button>
             </div>
@@ -208,34 +218,38 @@
         }
 
         document.getElementById('verify-key-btn').addEventListener('click', async () => {
-            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const ytKey = document.getElementById('ytApiKeyInput').value.trim();
+            const geminiKey = document.getElementById('geminiApiKeyInput').value.trim();
             const btn = document.getElementById('verify-key-btn');
             
-            if (!apiKey) return alert("Por favor ingresa tu API Key.");
+            if (!ytKey || !geminiKey) return alert("Por favor ingresa ambas API Keys.");
             
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando...';
+            btn.disabled = true;
             try {
-                // Verificar ambas APIs con peticiones muy ligeras
-                const ytCheck = await fetch(`https://www.googleapis.com/youtube/v3/search?part=id&maxResults=1&q=test&key=${apiKey}`);
-                if (!ytCheck.ok) throw new Error("YouTube API no activada en esta llave.");
+                const ytCheck = await fetch(`https://www.googleapis.com/youtube/v3/search?part=id&maxResults=1&q=test&key=${ytKey}`);
+                if (!ytCheck.ok) throw new Error("YouTube API Key inválida o sin permisos.");
                 
-                const geminiCheck = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-                if (!geminiCheck.ok) throw new Error("Gemini API no activada en esta llave.");
+                const geminiCheck = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+                if (!geminiCheck.ok) throw new Error("Gemini API Key inválida o sin permisos.");
 
-                btn.className = "bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg";
+                btn.className = "bg-emerald-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg w-full sm:w-auto self-end";
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Conectado';
+                btn.disabled = false;
             } catch (error) {
-                btn.className = "bg-red-600 text-white px-6 py-2 rounded-xl text-sm font-bold";
+                btn.className = "bg-red-600 text-white px-6 py-2 rounded-xl text-sm font-bold w-full sm:w-auto self-end";
                 btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Error';
+                btn.disabled = false;
                 alert(error.message);
             }
         });
 
         document.getElementById('search-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const ytKey = document.getElementById('ytApiKeyInput').value.trim();
+            const geminiKey = document.getElementById('geminiApiKeyInput').value.trim();
             const keyword = document.getElementById('keyword').value.trim();
-            if (!apiKey) return alert("Valida tu API Key primero.");
+            if (!ytKey || !geminiKey) return alert("Ingresa y valida ambas API Keys primero.");
 
             const submitBtn = document.getElementById('search-btn');
             const loading = document.getElementById('loading-state');
@@ -252,7 +266,7 @@
             try {
                 // 1. BUSCAR VIDEOS EN YOUTUBE
                 loadingText.textContent = "Paso 1: Buscando videos posicionados...";
-                const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${encodeURIComponent(keyword)}&type=video&key=${apiKey}`);
+                const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${encodeURIComponent(keyword)}&type=video&key=${ytKey}`);
                 if (!searchRes.ok) throw new Error("Fallo al buscar en YouTube. Revisa cuotas de API.");
                 const searchData = await searchRes.json();
                 
@@ -262,7 +276,7 @@
 
                 // 2. OBTENER DETALLES (VISTAS, DURACIÓN, TAGS)
                 loadingText.textContent = "Paso 2: Extrayendo analíticas profundas (Vistas, Tags)...";
-                const detailsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${apiKey}`);
+                const detailsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${ytKey}`);
                 const detailsData = await detailsRes.json();
 
                 const videos = detailsData.items;
@@ -351,7 +365,7 @@
                 }
                 `;
 
-                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
